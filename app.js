@@ -49,13 +49,14 @@ function initializeGisClient() {
 function checkState() {
     if (gapiInited && gisInited) {
         const storedToken = gapi.client.getToken();
-        
-        // Use a more robust check for authorization status
         const isAuthorized = storedToken && storedToken.access_token;
 
+        // Make sure these lines are exactly as shown:
         document.getElementById('authorize_button').style.display = isAuthorized ? 'none' : 'block';
         document.getElementById('signout_button').style.display = isAuthorized ? 'block' : 'none';
         document.getElementById('data_form').style.display = isAuthorized ? 'block' : 'none';
+        
+        // ... rest of the status message logic ...
         
         if (isAuthorized) {
             document.getElementById('status_message').innerText = '✅ Authorized to save data.';
