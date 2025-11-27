@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Attendance & Salary System</title>
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+    <div class="container">
+        <h1>Attendance Data Entry 📝</h1>
+        
+        <div class="auth-section">
+            <p>Please authorize with Google Drive to save data.</p>
+            <button id="authorize_button" class="btn btn-primary" style="display: none;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" alt="Google Logo" class="google-logo">
+                Authorize Google Drive
+            </button>
+            <button id="signout_button" class="btn btn-secondary" style="display: none;">Sign Out</button>
+        </div>
+
+        <div id="data_form" class="data-form" style="display: none;">
+            <h2>Enter Employee Details</h2>
+            <div class="input-group">
+                <label for="employee_name">Employee Name</label>
+                <input type="text" id="employee_name" placeholder="E.g., Anil Kumar" required>
+            </div>
+
+            <div class="input-group">
+                <label for="shift">Shift (12A, 12B, or 9G)</label>
+                <select id="shift" required>
+                    <option value="">Select Shift</option>
+                    <option value="12A">12 Hours - Shift A</option>
+                    <option value="12B">12 Hours - Shift B</option>
+                    <option value="9G">9 Hours - General</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="hours">Hours Worked</label>
+                <input type="number" id="hours" min="1" max="15" placeholder="Enter hours (e.g., 9 or 12)" required>
+            </div>
+
+            <div class="input-group">
+                <label for="password">Encryption Key / Password</label>
+                <input type="password" id="password" placeholder="Enter Strong Password to Encrypt File" required>
+                <small>⚠️ This password is required to decrypt the file later.</small>
+            </div>
+            
+            <button id="save_button" class="btn btn-success">💾 Save Encrypted Data</button>
+        </div>
+
+        <p id="status_message" class="status-message"></p>
+    </div>
+
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="initializeGisClient()"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    
+    <script src="app.js"></script>
+</body>
+</html>
