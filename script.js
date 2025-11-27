@@ -1,5 +1,5 @@
 // ⭐⭐⭐ 1. CONFIGURATION: REPLACE THIS WITH YOUR GOOGLE CLOUD CLIENT ID ⭐⭐⭐
-const CLIENT_ID = 'YOUR_GOOGLE_CLOUD_CLIENT_ID'; 
+const CLIENT_ID = '887069703934-o2thfso17bur08q3novje0meenf13l0v.apps.googleusercontent.com'; 
 
 // --- Google API and App Configuration ---
 const SCOPES = 'https://www.googleapis.com/auth/drive.file'; 
