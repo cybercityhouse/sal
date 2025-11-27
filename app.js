@@ -1,226 +1,174 @@
-// ⭐⭐⭐ 1. CONFIGURATION: REPLACE THIS WITH YOUR GOOGLE CLOUD CLIENT ID ⭐⭐⭐
-const CLIENT_ID = '887069703934-o2thfso17bur08q3novje0meenf13l0v.apps.googleusercontent.com'; 
+// ⭐ CONFIGURATION
+const CLIENT_ID = '887069703934-o2thfso17bur08q3novje0meenf13l0v.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 
-// --- Google API and App Configuration ---
-const SCOPES = 'https://www.googleapis.com/auth/drive.file'; 
-const FOLDER_NAME = "HR_Attendance_Data"; 
-const FILE_MIMETYPE = 'text/plain'; 
-
+// Global variables
+let tokenClient;
 let gapiInited = false;
 let gisInited = false;
-let tokenClient;
 
-// --- 2. INITIALIZATION AND AUTHENTICATION ---
-
-// Called when the gapi.js script is fully loaded
+// 1. Load GAPI (Google API Client)
 function gapiLoaded() {
     gapi.load('client', initializeGapiClient);
 }
 
-// Initialize GAPI client and check for existing token
 async function initializeGapiClient() {
-    await gapi.client.init({});
+    await gapi.client.init({
+        discoveryDocs: [DISCOVERY_DOC],
+    });
     gapiInited = true;
-    checkState();
+    maybeEnableButtons();
 }
 
-// Initialize Google Identity Services (GIS) client for OAuth
+// 2. Load GIS (Google Identity Services)
 function initializeGisClient() {
-    // This function relies on the correct client.js script being loaded
     tokenClient = google.accounts.oauth2.initCodeClient({
         client_id: CLIENT_ID,
         scope: SCOPES,
         callback: (resp) => {
             if (resp.error !== undefined) {
-                console.error('Authorization failed:', resp);
-                document.getElementById('status_message').innerText = '❌ Authorization Failed.';
+                console.error("Auth Error:", resp);
                 return;
             }
-            // Token received, user is authorized
+            // Save token to GAPI client
             gapi.client.setToken(resp);
-            checkState();
+            maybeEnableButtons();
         },
     });
     gisInited = true;
-    checkState();
+    maybeEnableButtons();
 }
 
-// Check if both libraries are loaded and update UI state
-function checkState() {
+// 3. UI Logic
+function maybeEnableButtons() {
     if (gapiInited && gisInited) {
-        const storedToken = gapi.client.getToken();
-        const isAuthorized = storedToken && storedToken.access_token;
+        // Check if we already have a valid token
+        const token = gapi.client.getToken();
+        const isAuthorized = token && token.access_token;
 
-        // Make sure these lines are exactly as shown:
-        document.getElementById('authorize_button').style.display = isAuthorized ? 'none' : 'block';
-        document.getElementById('signout_button').style.display = isAuthorized ? 'block' : 'none';
-        document.getElementById('data_form').style.display = isAuthorized ? 'block' : 'none';
-        
-        // ... rest of the status message logic ...
-        
         if (isAuthorized) {
-            document.getElementById('status_message').innerText = '✅ Authorized to save data.';
-            document.getElementById('status_message').classList.add('success');
-        } else if (gapiInited && gisInited) {
-            document.getElementById('status_message').innerText = 'Please click "Authorize Google Drive" to start.';
-            document.getElementById('status_message').classList.remove('success');
+            document.getElementById('authorize_button').style.display = 'none';
+            document.getElementById('auth_instruction').style.display = 'none';
+            document.getElementById('signout_button').style.display = 'block';
+            document.getElementById('data_form').style.display = 'block';
+            document.getElementById('status_message').innerText = "✅ Authorized";
+            document.getElementById('status_message').className = "status-message success";
+        } else {
+            document.getElementById('authorize_button').style.display = 'block';
+            document.getElementById('auth_instruction').style.display = 'block';
+            document.getElementById('signout_button').style.display = 'none';
+            document.getElementById('data_form').style.display = 'none';
         }
     }
 }
 
-// Attach event listeners when the window loads
-window.onload = function() {
-    document.getElementById('authorize_button').onclick = handleAuthClick;
-    document.getElementById('signout_button').onclick = handleSignoutClick;
-    document.getElementById('save_button').onclick = handleSaveClick;
-    // GIS initialization is triggered by the HTML script load (initializeGisClient)
-};
-
-// Initiate the Google OAuth authorization flow
+// 4. Event Handlers
 function handleAuthClick() {
-    // This is the function that was previously failing
     if (tokenClient) {
+        // Request authorization
         tokenClient.requestAccessToken();
     } else {
-        console.error("tokenClient is not defined. GIS script likely failed to load.");
+        console.error('Google Identity Services not initialized yet.');
+        alert('System loading... please wait a moment and try again.');
     }
 }
 
-// Sign out the user and revoke the token
 function handleSignoutClick() {
     const token = gapi.client.getToken();
     if (token !== null) {
         google.accounts.oauth2.revoke(token.access_token, () => {
-            console.log('Revocation successful');
-            gapi.client.setToken(null);
-            checkState(); // Update UI
+            gapi.client.setToken(null); // Clear token
+            document.getElementById('status_message').innerText = "Signed out";
+            document.getElementById('status_message').className = "status-message";
+            maybeEnableButtons(); // Update UI
         });
     }
 }
 
-// --- 3. ENCRYPTION AND UPLOAD LOGIC ---
-
-/**
- * Encrypts the raw data string using AES-256 with a strong password.
- */
-function encryptData(rawData, password) {
-    const encrypted = CryptoJS.AES.encrypt(rawData, password).toString();
-    return encrypted;
-}
-
-// Main handler for saving data
 async function handleSaveClick() {
     const statusEl = document.getElementById('status_message');
-    statusEl.innerText = 'Processing... Please wait.';
-    statusEl.classList.remove('success');
+    statusEl.innerText = 'Encrypting and Uploading...';
+    statusEl.className = 'status-message';
 
-    const name = document.getElementById('employee_name').value.trim();
+    const name = document.getElementById('employee_name').value;
     const shift = document.getElementById('shift').value;
     const hours = document.getElementById('hours').value;
-    const password = document.getElementById('password').value.trim();
+    const password = document.getElementById('password').value;
 
     if (!name || !shift || !hours || !password) {
-        statusEl.innerText = '❌ Please fill in all fields.';
+        statusEl.innerText = '❌ Please fill all fields.';
+        statusEl.className = 'status-message error';
         return;
     }
 
     try {
-        // 1. Format data for CSV
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        // CSV Format: Date,Employee Name,Shift,Hours Worked
-        const rawData = `${today},"${name}","${shift}",${hours}\n`;
-        
-        // 2. Encrypt the data
-        const encryptedContent = encryptData(rawData, password);
+        // A. Create CSV String
+        const date = new Date().toISOString().split('T')[0];
+        const csvData = `Date,Name,Shift,Hours\n${date},"${name}","${shift}",${hours}`;
 
-        // 3. Upload the encrypted data to Google Drive
-        await uploadFileToDrive(encryptedContent);
+        // B. Encrypt with AES-256 (CryptoJS)
+        const encrypted = CryptoJS.AES.encrypt(csvData, password).toString();
+
+        // C. Upload to Drive
+        await uploadFileToDrive(encrypted);
+
+        statusEl.innerText = '✅ Saved securely to Google Drive!';
+        statusEl.className = 'status-message success';
         
-        statusEl.innerText = '✅ Data saved successfully to Google Drive!';
-        statusEl.classList.add('success');
-        
-        // Clear form fields except password
+        // Clear inputs
         document.getElementById('employee_name').value = '';
         document.getElementById('hours').value = '';
-
-    } catch (error) {
-        console.error('Save failed:', error);
-        statusEl.innerText = `❌ Error saving data. Please check console.`;
-        statusEl.classList.remove('success');
+    } catch (err) {
+        console.error(err);
+        statusEl.innerText = '❌ Error saving file. See console.';
+        statusEl.className = 'status-message error';
     }
 }
 
+// 5. Drive Upload Helper
+async function uploadFileToDrive(content) {
+    const fileName = `attendance_${Date.now()}.vocos`;
+    const folderName = "HR_Attendance_Data";
 
-/**
- * Uploads the encrypted data as a file with a custom extension to Google Drive.
- */
-async function uploadFileToDrive(encryptedContent) {
-    const FILE_NAME = `attendance_entry_${Date.now()}.vocos`; 
+    // Find or create folder
+    let folderId = null;
+    const q = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
+    const search = await gapi.client.drive.files.list({ q: q, fields: 'files(id)' });
+    
+    if (search.result.files.length > 0) {
+        folderId = search.result.files[0].id;
+    } else {
+        const newFolder = await gapi.client.drive.files.create({
+            resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder' },
+            fields: 'id'
+        });
+        folderId = newFolder.result.id;
+    }
 
-    // 1. Find or Create the target folder
-    let folderId = await findOrCreateFolder(FOLDER_NAME);
-
-    // 2. Prepare metadata and file content (Blob)
-    const file = new Blob([encryptedContent], { type: FILE_MIMETYPE });
+    // Prepare multipart upload
     const metadata = {
-        name: FILE_NAME,
-        mimeType: FILE_MIMETYPE,
-        ...(folderId && { parents: [folderId] }) 
+        name: fileName,
+        mimeType: 'text/plain',
+        parents: [folderId]
     };
 
-    // 3. Use FormData for multipart upload
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
+    form.append('file', new Blob([content], { type: 'text/plain' }));
 
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    const accessToken = gapi.client.getToken().access_token;
+    
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
-        headers: {
-            'Authorization': 'Bearer ' + gapi.client.getToken().access_token
-        },
+        headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
         body: form
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        // Check for specific authorization errors
-        if (response.status === 401) {
-            throw new Error(`Authorization required. Please sign out and re-authorize.`);
-        }
-        throw new Error(`Drive Upload Failed: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    return result;
 }
 
-
-/**
- * Helper function to find or create a specific folder in Google Drive.
- */
-async function findOrCreateFolder(folderName) {
-    const q = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    
-    // 1. Search for the folder
-    const searchResponse = await gapi.client.drive.files.list({
-        q: q,
-        spaces: 'drive',
-        fields: 'files(id)'
-    });
-
-    if (searchResponse.result.files.length > 0) {
-        return searchResponse.result.files[0].id;
-    }
-
-    // 2. If not found, create it
-    const createResponse = await gapi.client.drive.files.create({
-        resource: {
-            name: folderName,
-            mimeType: 'application/vnd.google-apps.folder'
-        },
-        fields: 'id'
-    });
-
-    return createResponse.result ? createResponse.result.id : null;
-}
+// Bind events on load
+window.onload = function() {
+    document.getElementById('authorize_button').onclick = handleAuthClick;
+    document.getElementById('signout_button').onclick = handleSignoutClick;
+    document.getElementById('save_button').onclick = handleSaveClick;
+};
