@@ -4,6 +4,7 @@ body {
     display: flex;
     justify-content: center;
     padding-top: 50px;
+    margin: 0;
 }
 
 .container {
@@ -11,7 +12,7 @@ body {
     padding: 2rem;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    width: 100%;
+    width: 90%;
     max-width: 480px;
 }
 
@@ -62,10 +63,11 @@ input, select {
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-top: 10px;
 }
 
 .btn-primary {
-    background-color: #1a73e8; /* Google Blue */
+    background-color: #1a73e8;
     color: white;
 }
 .btn-primary:hover { background-color: #1557b0; }
