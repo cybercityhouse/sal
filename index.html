@@ -3,67 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Attendance & Salary System</title>
+    <title>HR System - Debug Mode</title>
     <link rel="shortcut icon" href="#">
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* CSS STYLES */
+        body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .btn { display: block; width: 100%; padding: 10px; margin-top: 10px; cursor: pointer; background: #007bff; color: white; border: none; font-size: 16px; border-radius: 4px; }
+        .btn:hover { background: #0056b3; }
+        .hidden { display: none; }
+        input, select { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        
+        /* DEBUG BOX STYLES */
+        #debug-console {
+            margin-top: 30px;
+            background: #000;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            height: 200px;
+            overflow-y: scroll;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Attendance Data Entry 📝</h1>
-        
-        <div class="auth-section">
-            <p id="auth_instruction">Please authorize with Google Drive to save data.</p>
-            
-            <button id="authorize_button" class="btn btn-primary">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" alt="Google Logo" class="google-logo">
-                Authorize Google Drive
-            </button>
-            
-            <button id="signout_button" class="btn btn-secondary" style="display: none;">Sign Out</button>
-        </div>
-
-        <div id="data_form" class="data-form" style="display: none;">
-            <h2>Enter Employee Details</h2>
-            <div class="input-group">
-                <label for="employee_name">Employee Name</label>
-                <input type="text" id="employee_name" placeholder="E.g., Rahul Deswal" required>
-            </div>
-
-            <div class="input-group">
-                <label for="shift">Shift (12A, 12B, or 9G)</label>
-                <select id="shift" required>
-                    <option value="">Select Shift</option>
-                    <option value="12A">12 Hours - Shift A</option>
-                    <option value="12B">12 Hours - Shift B</option>
-                    <option value="9G">9 Hours - General</option>
-                </select>
-            </div>
-
-            <div class="input-group">
-                <label for="hours">Hours Worked</label>
-                <input type="number" id="hours" min="1" max="15" placeholder="Enter hours" required>
-            </div>
-
-            <div class="input-group">
-                <label for="password">Encryption Key / Password</label>
-                <input type="password" id="password" placeholder="Enter Strong Password" required>
-                <small>⚠️ Remember this password to decrypt the file later.</small>
-            </div>
-            
-            <button id="save_button" class="btn btn-success">💾 Save Encrypted Data</button>
-        </div>
-
-        <p id="status_message" class="status-message"></p>
+<div class="container">
+    <h2>HR Attendance (Debug Mode) 🛠️</h2>
+    
+    <div id="auth-section">
+        <p>Status: <span id="auth-status">Waiting for Google Scripts...</span></p>
+        <button id="authorize_button" class="btn" onclick="handleAuthClick()">Authorize Google Drive</button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <div id="data_form" class="hidden">
+        <h3>Enter Data</h3>
+        <input type="text" id="employee_name" placeholder="Employee Name">
+        <select id="shift">
+            <option value="12A">12 Hours A</option>
+            <option value="12B">12 Hours B</option>
+            <option value="9G">9 Hours Gen</option>
+        </select>
+        <input type="number" id="hours" placeholder="Hours">
+        <input type="password" id="password" placeholder="Encryption Password">
+        <button class="btn" onclick="handleSaveClick()">Save to Drive</button>
+        <button class="btn" style="background:#555; margin-top:5px;" onclick="handleSignout()">Sign Out</button>
+    </div>
+</div>
 
-    <script src="app.js"></script>
+<div id="debug-console">System Logs:<br></div>
 
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    
-    <script async defer src="https://accounts.google.com/gsi/client.js" onload="initializeGisClient()"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
+<script>
+    // --- LOGGER FUNCTION ---
+    function log(msg) {
+        const consoleDiv = document.getElementById('debug-console');
+        const time = new Date().toLocaleTimeString();
+        consoleDiv.innerHTML += `[${time}] ${msg}<br>`;
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        console.log(msg);
+    }
+
+    log("App started. Initializing...");
+
+    // --- CONFIG ---
+    const CLIENT_ID = '887069703934-o2thfso17bur08q3novje0meenf13l0v.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+
+    // --- 1. GAPI LOADED ---
+    function gapiLoaded() {
+        log("GAPI script loaded. Initializing client...");
+        gapi.load('client', async () => {
+            try {
+                await gapi.client.init({
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+                });
+                gapiInited = true;
+                log("✅ GAPI Client Initialized.");
+                checkAuth();
+            } catch (err) {
+                log("❌ GAPI Init Failed: " + JSON.stringify(err));
+            }
+        });
+    }
+
+    // --- 2. GIS LOADED ---
+    function gisLoaded() {
+        log("GIS script loaded. Initializing Code Client...");
+        try {
+            tokenClient = google.accounts.oauth2.initCodeClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (resp) => {
+                    if (resp.error) {
+                        log("❌ Auth Error: " + JSON.stringify(resp));
+                        return;
+                    }
+                    log("✅ Token received.");
+                    gapi.client.setToken(resp);
+                    checkAuth();
+                },
+            });
+            gisInited = true;
+            log("✅ GIS Client Initialized. tokenClient is ready.");
+        } catch (err) {
+            log("❌ GIS Init Failed: " + err.message);
+        }
+    }
+
+    // --- 3. CHECK AUTH STATE ---
+    function checkAuth() {
+        if (!gapiInited || !gisInited) return;
+        
+        const token = gapi.client.getToken();
+        if (token && token.access_token) {
+            log("User is Authorized.");
+            document.getElementById('auth-status').innerText = "Authorized ✅";
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('data_form').classList.remove('hidden');
+        } else {
+            log("User not authorized yet.");
+            document.getElementById('auth-status').innerText = "Please Click Authorize";
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('data_form').classList.add('hidden');
+        }
+    }
+
+    // --- 4. BUTTON HANDLERS ---
+    function handleAuthClick() {
+        log("Authorize button clicked.");
+        if (tokenClient) {
+            log("Requesting Access Token...");
+            tokenClient.requestAccessToken();
+        } else {
+            log("❌ Error: tokenClient is undefined. GIS script failed?");
+            alert("Google Scripts not loaded yet. Check internet or ad-blockers.");
+        }
+    }
+
+    function handleSignout() {
+        const token = gapi.client.getToken();
+        if (token) {
+            google.accounts.oauth2.revoke(token.access_token, () => {
+                gapi.client.setToken(null);
+                log("Signed out.");
+                checkAuth();
+            });
+        }
+    }
+
+    async function handleSaveClick() {
+        log("Starting save process...");
+        const name = document.getElementById('employee_name').value;
+        const pass = document.getElementById('password').value;
+
+        if (!name || !pass) {
+            log("❌ Missing name or password.");
+            alert("Enter Name and Password.");
+            return;
+        }
+
+        try {
+            const content = `Date,Name\n${new Date().toISOString()},${name}`;
+            const encrypted = CryptoJS.AES.encrypt(content, pass).toString();
+            log("Data Encrypted.");
+
+            // Upload
+            const meta = { name: 'debug_test.vocos', mimeType: 'text/plain' };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+            form.append('file', new Blob([encrypted], { type: 'text/plain' }));
+
+            log("Uploading to Drive...");
+            const token = gapi.client.getToken().access_token;
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: form
+            });
+
+            if(res.ok) {
+                log("✅ File Uploaded Successfully!");
+                alert("Saved to Drive!");
+            } else {
+                const txt = await res.text();
+                log("❌ Upload Failed: " + txt);
+            }
+        } catch (err) {
+            log("❌ Save Error: " + err.message);
+        }
+    }
+</script>
+
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client.js" onload="gisLoaded()"></script>
 
 </body>
 </html>
